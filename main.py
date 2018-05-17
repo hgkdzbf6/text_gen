@@ -1,8 +1,10 @@
+# This Python file uses the following encoding: utf-8
 import os
 import os.path as ops
 import numpy as np
 import random
 import cv2
+import argparse
 from PIL import Image, ImageFilter, ImageEnhance, ImageStat
 
 from multiprocessing import Pool
@@ -42,7 +44,7 @@ def text_generate(text, dict, width, height):
     for character in text:
         pic = Image.open(get_one_number(dict,character))
         pic.rotate(random.randint(-5,5),expand=1)
-        image_width, image_height = pic.size
+        image_width, _ = pic.size
 
         # 如果太小,拉伸图像
         # if pic.size[0] < width:
@@ -52,12 +54,12 @@ def text_generate(text, dict, width, height):
         _,_,_,alpha = pic.split()
         pic_b = ImageEnhance.Brightness(pic)
         stat = ImageStat.Stat(pic)
-        brightness = 140/(stat.mean[0]+20)
-        print(brightness)
+        brightness = 110/(stat.mean[0]+20)
+        # print(brightness)
         pic = pic_b.enhance(brightness)
         image.paste(pic,(addition,0),mask=alpha)
         image_mask.paste(pic,(addition,0),mask=alpha)
-        addition = addition + image_width
+        addition = addition + image_width +4
     image = image.crop([0,0,addition+12,image.height])
     image_mask = image_mask.crop([0,0,addition+12,image.height])
     return image,image_mask
@@ -85,8 +87,7 @@ def disorted_generate(src):
     return src
 
 def generate(out_dir,index,text,skewing_angle=1,width=49,height=59,blur=0):
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
+    # print(out_dir)
     the_dict = read_material('./pics')
     image,image_mask = text_generate(str(text),the_dict,width,height)
     # 创建图片
@@ -107,23 +108,24 @@ def generate(out_dir,index,text,skewing_angle=1,width=49,height=59,blur=0):
     new_width = float(new_text_width + margin[1] + margin[0]) * (float(height) / float(new_text_height + margin[2]+ margin[3]))
     image_on_background = background.resize((int(new_width),height), Image.ANTIALIAS)
     final_image = image_on_background.filter(ImageFilter.GaussianBlur(blur))
+    final_image = final_image.filter(ImageFilter.EMBOSS)
     # 生成名称     
     image_name  = '{}_{}.{}'.format(text, str(index), 'png')
     final_image.save(ops.join(out_dir,image_name))
     return final_image
 
-def simple_generate():
-    return generate('./out',str(random.randint(0,1000000)),str(random.randint(0,1000000)))
+def simple_generate(out_dir):
+    return generate(out_dir,str(random.randint(0,100000000)),str(random.randint(0,100000000)))
 
-def run(thread_count,number):
+def run(thread_count,number,out_dir):
     p=Pool(thread_count)
     files = init_file('./pics')
     for _ in range(number):
-        p.apply_async(simple_generate,[])
+        p.apply_async(simple_generate,[out_dir])
     p.close()
     p.join()    
     f = open(os.path.join('./', 'sample.txt'),'w')
-    files = init_file('./out')
+    files = init_file(out_dir)
     # print(files)
     for file in files:
         file_name = file.split('/')[-1]
@@ -131,10 +133,39 @@ def run(thread_count,number):
         f.write("{} {}\n".format(file,text))
     f.close()
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Generate synthetic text data for text recognition.')
+    parser.add_argument(
+        "output_dir",
+        type=str,
+        nargs="?",
+        help="The output directory",
+        default="./out",
+    )
+    parser.add_argument(
+        "-t",
+        "--thread_count",
+        type=int,
+        nargs="?",
+        help="Define the number of thread to use for image generation",
+        default=8,
+    )
+    parser.add_argument(
+        "-c",
+        "--count",
+        type=int,
+        nargs="?",
+        help="The number of images to be created.",
+        default=100
+    )
+    return parser.parse_args()
 
 def main(): 
     # generate('./out',1,1245231415)
-    run(8,1)
+    args = parse_arguments()
+    if not os.path.isdir(args.output_dir):
+        os.makedirs(args.output_dir)
+    run(args.thread_count,args.count,args.output_dir)
     
 if __name__ == '__main__':
     main()
