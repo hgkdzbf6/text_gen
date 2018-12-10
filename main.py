@@ -207,6 +207,7 @@ def parse_arguments():
 
 def main(): 
     # generate('./out',1,1245231415)
+    print("first, start to generate pictures.")
     args = parse_arguments()
     if os.path.isdir(args.output_dir):
         shutil.rmtree(args.output_dir,True)
